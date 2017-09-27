@@ -65,3 +65,26 @@ def normalize_text(text, remove_apostrophe=True):
         result = result.replace("'", "")
 
     return re.sub("[^a-zA-Z']+", ' ', result).strip().lower()
+
+
+def sparse_tuples_from_sequences(sequences, dtype=np.int32):
+    """
+    Create a sparse representations of inputs.
+
+    Args:
+        sequences: a list of lists of type dtype where each element is a sequence
+    Returns:
+        A tuple with (indices, values, shape)
+    """
+    indexes = []
+    values = []
+
+    for n, sequence in enumerate(sequences):
+        indexes.extend(zip([n] * len(sequence), range(len(sequence))))
+        values.extend(sequence)
+
+    indexes = np.asarray(indexes, dtype=np.int64)
+    values = np.asarray(values, dtype=dtype)
+    shape = np.asarray([len(sequences), np.asarray(indexes).max(0)[1] + 1], dtype=np.int64)
+
+    return indexes, values, shape
