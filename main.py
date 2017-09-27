@@ -27,6 +27,16 @@ def read_text_file(path):
 def make_char_array(text, space_token='<space>'):
     """
     Make text as char array. Replace spaces with space token.
+
+    Args:
+        text: string.
+            Given text.
+        space_token: string.
+            Text which represents space char.
+
+    Returns:
+        string array.
+            Split text.
     """
     result = np.hstack([space_token if x == ' ' else list(x) for x in text])
     return result
@@ -34,7 +44,7 @@ def make_char_array(text, space_token='<space>'):
 
 def normalize_text(text, remove_apostrophe=True):
     """
-     Normalize given text.
+    Normalize given text.
 
     Args:
         text: string.
