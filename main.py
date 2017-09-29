@@ -2,19 +2,43 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import tensorflow as tf
 import numpy as np
+import time
 import codecs
 import unicodedata
 import re
-
-import tensorflow as tf
-
 import scipy.io.wavfile as wav
+from python_speech_features import mfcc
 
 DATA_DIR = "data/LibriSpeech/"
 TRAIN_DIR = DATA_DIR + "train-clean-100-wav/"
 TEST_DIR = DATA_DIR + "test-clean-wav/"
 DEV_DIR = DATA_DIR + "dev-clean-wav/"
+
+# Constants
+SPACE_TOKEN = '<space>'
+SPACE_INDEX = 0
+FIRST_INDEX = ord('a') - 1  # 0 is reserved to space
+
+# Number of features
+NUM_FEATURES = 13
+# Accounting the 0th index + space + blank label = 28 characters
+NUM_CLASSES = ord('z') - ord('a') + 1 + 1 + 1
+
+# Hyper-parameters
+NUM_EPOCHS = 200
+NUM_HIDDEN = 50
+NUM_LAYERS = 1
+BATCH_SIZE = 1
+
+# Data parameters
+NUM_EXAMPLES = 1
+NUM_BATCHES_PER_EPOCH = int(NUM_EXAMPLES / BATCH_SIZE)
+
+# Optimizer
+INITIAL_LEARNING_RATE = 1e-2
+MOMENTUM = 0.9
 
 
 def read_text_file(path):
@@ -108,6 +132,124 @@ def main(argv):
     # Read audio file.
     wav_file_path = TRAIN_DIR + "211-122425-0059.wav"
     audio_rate, audio_data = wav.read(wav_file_path)
+    inputs = mfcc(audio_data, samplerate=audio_rate)
+
+    # Make text as as char array.
+    labels = make_char_array(text, SPACE_TOKEN)
+    labels = np.asarray([SPACE_INDEX if x == SPACE_TOKEN else ord(x) - FIRST_INDEX for x in labels])
+
+    # Labels sparse representation for feeding the placeholder.
+    train_labels = sparse_tuples_from_sequences([labels])
+
+    # Train inputs.
+    train_inputs = np.asarray(inputs[np.newaxis, :])
+    train_inputs = (train_inputs - np.mean(train_inputs)) / np.std(train_inputs)
+    train_sequence_length = [train_inputs.shape[1]]
+
+    # TODO(ugnelis): define different validation variables.
+    validation_inputs = train_inputs
+    validation_labels = train_labels
+    validation_sequence_length = train_sequence_length
+
+    with tf.device('/gpu:0'):
+        config = tf.ConfigProto(allow_soft_placement=True)
+        config.gpu_options.allow_growth = True
+
+        graph = tf.Graph()
+        with graph.as_default():
+
+            inputs_placeholder = tf.placeholder(tf.float32, [None, None, NUM_FEATURES])
+
+            # SparseTensor placeholder required by ctc_loss op.
+            labels_placeholder = tf.sparse_placeholder(tf.int32)
+
+            # 1d array of size [batch_size].
+            sequence_length_placeholder = tf.placeholder(tf.int32, [None])
+
+            # Defining the cell.
+            cell = tf.contrib.rnn.LSTMCell(NUM_HIDDEN, state_is_tuple=True)
+
+            # Stacking rnn cells.
+            stack = tf.contrib.rnn.MultiRNNCell([cell] * NUM_LAYERS,
+                                                state_is_tuple=True)
+
+            # Creates a recurrent neural network.
+            outputs, _ = tf.nn.dynamic_rnn(stack, inputs_placeholder, sequence_length_placeholder, dtype=tf.float32)
+
+            shape = tf.shape(inputs_placeholder)
+            batch_s, max_time_steps = shape[0], shape[1]
+
+            # Reshaping to apply the same weights over the time steps.
+            outputs = tf.reshape(outputs, [-1, NUM_HIDDEN])
+
+            weigths = tf.Variable(tf.truncated_normal([NUM_HIDDEN,
+                                                       NUM_CLASSES],
+                                                      stddev=0.1))
+            biases = tf.Variable(tf.constant(0., shape=[NUM_CLASSES]))
+
+            # Doing the affine projection.
+            logits = tf.matmul(outputs, weigths) + biases
+
+            # Reshaping back to the original shape.
+            logits = tf.reshape(logits, [batch_s, -1, NUM_CLASSES])
+
+            # Time is major.
+            logits = tf.transpose(logits, (1, 0, 2))
+
+            loss = tf.nn.ctc_loss(labels_placeholder, logits, sequence_length_placeholder)
+            cost = tf.reduce_mean(loss)
+
+            optimizer = tf.train.MomentumOptimizer(INITIAL_LEARNING_RATE, 0.9).minimize(cost)
+
+            # CTC decoder.
+            decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, sequence_length_placeholder)
+
+            label_error_rate = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32),
+                                                               labels_placeholder))
+        with tf.Session(graph=graph) as session:
+            # Initializate the weights and biases
+            tf.global_variables_initializer().run()
+
+            for current_epoch in range(NUM_EPOCHS):
+                train_cost = train_label_error_rate = 0
+                start = time.time()
+
+                for batch in range(NUM_BATCHES_PER_EPOCH):
+                    feed = {inputs_placeholder: train_inputs,
+                            labels_placeholder: train_labels,
+                            sequence_length_placeholder: train_sequence_length}
+
+                    batch_cost, _ = session.run([cost, optimizer], feed)
+                    train_cost += batch_cost * BATCH_SIZE
+                    train_label_error_rate += session.run(label_error_rate, feed_dict=feed) * BATCH_SIZE
+
+                train_cost /= NUM_EXAMPLES
+                train_label_error_rate /= NUM_EXAMPLES
+
+                val_feed = {inputs_placeholder: validation_inputs,
+                            labels_placeholder: validation_labels,
+                            sequence_length_placeholder: validation_sequence_length}
+
+                validation_cost, validation_label_error_rate = session.run([cost, label_error_rate], feed_dict=val_feed)
+
+                # Output intermediate step information.
+                print("Epoch %d/%d" %
+                      (current_epoch + 1, NUM_EPOCHS))
+                print("Train cost: %.3f, train label error rate: %.3f" %
+                      (train_cost, train_label_error_rate))
+                print("Validation cost: %.3f, validation label error rate: %.3f" %
+                      (validation_cost, validation_label_error_rate))
+
+            # Decoding.
+            decoded_outputs = session.run(decoded[0], feed_dict=feed)
+            decoded_text = ''.join([chr(x) for x in np.asarray(decoded_outputs[1]) + FIRST_INDEX])
+            # Replacing blank label to none.
+            decoded_text = decoded_text.replace(chr(ord('z') + 1), '')
+            # Replacing space label to space.
+            decoded_text = decoded_text.replace(chr(ord('a') - 1), ' ')
+
+            print('Original:\n%s' % text)
+            print('Decoded:\n%s' % decoded_text)
 
 
 if __name__ == '__main__':
