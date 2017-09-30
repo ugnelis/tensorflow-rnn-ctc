@@ -2,14 +2,22 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import time
+import re
+import logging
+import sys
+
 import tensorflow as tf
 import numpy as np
-import time
 import codecs
 import unicodedata
-import re
 import scipy.io.wavfile as wav
 from python_speech_features import mfcc
+
+# Logging configuration.
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    level=logging.DEBUG,
+                    stream=sys.stdout)
 
 DATA_DIR = "data/LibriSpeech/"
 TRAIN_DIR = DATA_DIR + "train-clean-100-wav/"
@@ -234,12 +242,16 @@ def main(argv):
                 validation_cost, validation_label_error_rate = session.run([cost, label_error_rate], feed_dict=val_feed)
 
                 # Output intermediate step information.
-                print("Epoch %d/%d (time: %.3f s)" %
-                      (current_epoch + 1, NUM_EPOCHS, time.time() - start_time))
-                print("Train cost: %.3f, train label error rate: %.3f" %
-                      (train_cost, train_label_error_rate))
-                print("Validation cost: %.3f, validation label error rate: %.3f" %
-                      (validation_cost, validation_label_error_rate))
+                logging.info("Epoch %d/%d (time: %.3f s)",
+                             current_epoch + 1,
+                             NUM_EPOCHS,
+                             time.time() - start_time)
+                logging.info("Train cost: %.3f, train label error rate: %.3f",
+                             train_cost,
+                             train_label_error_rate)
+                logging.info("Validation cost: %.3f, validation label error rate: %.3f",
+                             validation_cost,
+                             validation_label_error_rate)
 
             # Decoding.
             decoded_outputs = session.run(decoded[0], feed_dict=feed)
@@ -249,8 +261,8 @@ def main(argv):
             # Replacing space label to space.
             decoded_text = decoded_text.replace(chr(ord('a') - 1), ' ')
 
-            print('Original:\n%s' % text)
-            print('Decoded:\n%s' % decoded_text)
+            logging.info("Original:\n%s", text)
+            logging.info("Decoded:\n%s", decoded_text)
 
 
 if __name__ == '__main__':
