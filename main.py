@@ -171,7 +171,7 @@ def read_audio_files(dir, extensions=['wav']):
     return files
 
 
-def read_text_files(dir, extensions=['txt']):
+def read_text_files(dir, extensions=['txt'], first_index=(ord('a') - 1), space_index=0, space_token='<space>'):
     """
     Read text files.
 
@@ -180,6 +180,12 @@ def read_text_files(dir, extensions=['txt']):
             Data directory.
         extensions: list of strings.
             File extensions.
+        first_index: int.
+            First index (index of letter 'a' in alphabet.
+        space_index: int.
+            Index of 'space'.
+        space_token: string.
+            'space' representation.
     Returns:
         files: array of texts.
     """
@@ -202,31 +208,12 @@ def read_text_files(dir, extensions=['txt']):
     for file_path in files_paths_list:
         file = read_text_file(file_path)
         file = normalize_text(file)
-        files.append(file)
+        labels = make_char_array(file, space_token)
+        labels = np.asarray([space_index if x == space_token else ord(x) - first_index for x in labels])
+        files.append(labels)
 
     files = np.array(files)
     return files
-
-
-def read_data(dir):
-    """
-    Read files and create a dataset of inputs and labels.
-
-    Args:
-        dir: string.
-            Data directory.
-    Returns:
-        inputs: array of inputs (audios).
-        labels: array of labels (texts).
-    """
-    if not os.path.isdir(dir):
-        logging.error("Files directory %s is not found.", dir)
-        return None, None
-
-    # Read audio and text files.
-    inputs = read_audio_files(dir)
-    labels = read_text_files(dir)
-    return inputs, labels
 
 
 def main(argv):
