@@ -16,27 +16,28 @@ TRAIN_DIR = DATA_DIR + "train-clean-100-wav/"
 TEST_DIR = DATA_DIR + "test-clean-wav/"
 DEV_DIR = DATA_DIR + "dev-clean-wav/"
 
-# Constants
+# Constants.
 SPACE_TOKEN = '<space>'
 SPACE_INDEX = 0
 FIRST_INDEX = ord('a') - 1  # 0 is reserved to space
 
-# Number of features
+# Number of features.
 NUM_FEATURES = 13
+
 # Accounting the 0th index + space + blank label = 28 characters
 NUM_CLASSES = ord('z') - ord('a') + 1 + 1 + 1
 
-# Hyper-parameters
+# Hyper-parameters.
 NUM_EPOCHS = 200
 NUM_HIDDEN = 50
 NUM_LAYERS = 1
 BATCH_SIZE = 1
 
-# Data parameters
+# Data parameters.
 NUM_EXAMPLES = 1
 NUM_BATCHES_PER_EPOCH = int(NUM_EXAMPLES / BATCH_SIZE)
 
-# Optimizer
+# Optimizer parameters.
 INITIAL_LEARNING_RATE = 1e-2
 MOMENTUM = 0.9
 
@@ -207,12 +208,12 @@ def main(argv):
             label_error_rate = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32),
                                                                labels_placeholder))
         with tf.Session(graph=graph) as session:
-            # Initializate the weights and biases
+            # Initialize the weights and biases.
             tf.global_variables_initializer().run()
 
             for current_epoch in range(NUM_EPOCHS):
                 train_cost = train_label_error_rate = 0
-                start = time.time()
+                start_time = time.time()
 
                 for batch in range(NUM_BATCHES_PER_EPOCH):
                     feed = {inputs_placeholder: train_inputs,
@@ -233,8 +234,8 @@ def main(argv):
                 validation_cost, validation_label_error_rate = session.run([cost, label_error_rate], feed_dict=val_feed)
 
                 # Output intermediate step information.
-                print("Epoch %d/%d" %
-                      (current_epoch + 1, NUM_EPOCHS))
+                print("Epoch %d/%d (time: %.3f s)" %
+                      (current_epoch + 1, NUM_EPOCHS, time.time() - start_time))
                 print("Train cost: %.3f, train label error rate: %.3f" %
                       (train_cost, train_label_error_rate))
                 print("Validation cost: %.3f, validation label error rate: %.3f" %
