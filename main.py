@@ -181,7 +181,7 @@ def read_text_files(dir, extensions=['txt'], first_index=(ord('a') - 1), space_i
         extensions: list of strings.
             File extensions.
         first_index: int.
-            First index (index of letter 'a' in alphabet.
+            First index (usually index of 'a').
         space_index: int.
             Index of 'space'.
         space_token: string.
