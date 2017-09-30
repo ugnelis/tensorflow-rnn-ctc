@@ -2,6 +2,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
+import glob
 import time
 import re
 import logging
@@ -130,6 +132,101 @@ def sparse_tuples_from_sequences(sequences, dtype=np.int32):
     shape = np.asarray([len(sequences), np.asarray(indexes).max(0)[1] + 1], dtype=np.int64)
 
     return indexes, values, shape
+
+
+def read_audio_files(dir, extensions=['wav']):
+    """
+    Read audio files.
+
+    Args:
+        dir: string.
+            Data directory.
+        extensions: list of strings.
+            File extensions.
+    Returns:
+        files: array of audios.
+    """
+    if not os.path.isdir(dir):
+        logging.error("Audio files directory %s is not found.", dir)
+        return None
+
+    if not all(isinstance(extension, str) for extension in extensions):
+        logging.error("Variable 'extensions' is not a list of strings.")
+        return None
+
+    # Get files list.
+    files_paths_list = []
+    for extension in extensions:
+        file_glob = os.path.join(dir, '*.' + extension)
+        files_paths_list.extend(glob.glob(file_glob))
+
+    # Read files.
+    files = []
+    for file_path in files_paths_list:
+        audio_rate, audio_data = wav.read(file_path)
+        file = mfcc(audio_data, samplerate=audio_rate)
+        files.append(file)
+
+    files = np.array(files)
+    return files
+
+
+def read_text_files(dir, extensions=['txt']):
+    """
+    Read text files.
+
+    Args:
+        dir: string.
+            Data directory.
+        extensions: list of strings.
+            File extensions.
+    Returns:
+        files: array of texts.
+    """
+    if not os.path.isdir(dir):
+        logging.error("Text files directory %s is not found.", dir)
+        return None
+
+    if not all(isinstance(extension, str) for extension in extensions):
+        logging.error("Variable 'extensions' is not a list of strings.")
+        return None
+
+    # Get files list.
+    files_paths_list = []
+    for extension in extensions:
+        file_glob = os.path.join(dir, '*.' + extension)
+        files_paths_list.extend(glob.glob(file_glob))
+
+    # Read files.
+    files = []
+    for file_path in files_paths_list:
+        file = read_text_file(file_path)
+        file = normalize_text(file)
+        files.append(file)
+
+    files = np.array(files)
+    return files
+
+
+def read_data(dir):
+    """
+    Read files and create a dataset of inputs and labels.
+
+    Args:
+        dir: string.
+            Data directory.
+    Returns:
+        inputs: array of inputs (audios).
+        labels: array of labels (texts).
+    """
+    if not os.path.isdir(dir):
+        logging.error("Files directory %s is not found.", dir)
+        return None, None
+
+    # Read audio and text files.
+    inputs = read_audio_files(dir)
+    labels = read_text_files(dir)
+    return inputs, labels
 
 
 def main(argv):
