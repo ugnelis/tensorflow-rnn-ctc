@@ -8,11 +8,11 @@ import time
 import re
 import logging
 import sys
+import unicodedata
+import codecs
 
 import tensorflow as tf
 import numpy as np
-import codecs
-import unicodedata
 import scipy.io.wavfile as wav
 from python_speech_features import mfcc
 
