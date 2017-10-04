@@ -347,6 +347,8 @@ def main(argv):
 
             logging.info("Original:\n%s", text)
             logging.info("Decoded:\n%s", decoded_text)
+            saver = tf.train.Saver()
+            saver.save(session,'trained_models/trained_model')
 
 
 if __name__ == '__main__':
