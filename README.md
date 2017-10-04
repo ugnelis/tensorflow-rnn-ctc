@@ -1,4 +1,4 @@
-# TensorFlow RNN CTC ![Build Status](https://travis-ci.org/ugnelis/tensorflow-rnn-ctc.svg?branch=master)
+# TensorFlow RNN CTC [![Build Status](https://travis-ci.org/ugnelis/tensorflow-rnn-ctc.svg?branch=master)](https://travis-ci.org/ugnelis/tensorflow-rnn-ctc)
 
 Connectionist Temporal Classification (CTC) by using Recurrent Neural Network (RNN) in TensorFlow.
 
