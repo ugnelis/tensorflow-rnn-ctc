@@ -208,6 +208,26 @@ def read_text_files(dir, extensions=['txt']):
     return files
 
 
+def sequence_decoder(sequence, first_index=(ord('a') - 1)):
+    """
+    Read text files.
+
+    Args:
+        sequence: list of int.
+            Encoded sequence
+        first_index: int.
+            First index (usually index of 'a').
+    Returns:
+        decoded_text: string.
+    """
+    decoded_text = ''.join([chr(x) for x in np.asarray(sequence) + first_index])
+    # Replacing blank label to none.
+    decoded_text = decoded_text.replace(chr(ord('z') + 1), '')
+    # Replacing space label to space.
+    decoded_text = decoded_text.replace(chr(ord('a') - 1), ' ')
+    return decoded_text
+
+
 def main(argv):
     # Read text file.
     text_file_path = TRAIN_DIR + "211-122425-0059.txt"
@@ -331,11 +351,7 @@ def main(argv):
 
             # Decoding.
             decoded_outputs = session.run(decoded[0], feed_dict=feed)
-            decoded_text = ''.join([chr(x) for x in np.asarray(decoded_outputs[1]) + FIRST_INDEX])
-            # Replacing blank label to none.
-            decoded_text = decoded_text.replace(chr(ord('z') + 1), '')
-            # Replacing space label to space.
-            decoded_text = decoded_text.replace(chr(ord('a') - 1), ' ')
+            decoded_text = sequence_decoder(decoded_outputs[1])
 
             logging.info("Original:\n%s", text)
             logging.info("Decoded:\n%s", decoded_text)
