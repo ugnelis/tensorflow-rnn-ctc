@@ -171,7 +171,7 @@ def read_audio_files(dir, extensions=['wav']):
     return files
 
 
-def read_text_files(dir, extensions=['txt'], first_index=(ord('a') - 1), space_index=0, space_token='<space>'):
+def read_text_files(dir, extensions=['txt']):
     """
     Read text files.
 
@@ -180,12 +180,6 @@ def read_text_files(dir, extensions=['txt'], first_index=(ord('a') - 1), space_i
             Data directory.
         extensions: list of strings.
             File extensions.
-        first_index: int.
-            First index (usually index of 'a').
-        space_index: int.
-            Index of 'space'.
-        space_token: string.
-            'space' representation.
     Returns:
         files: array of texts.
     """
@@ -208,9 +202,7 @@ def read_text_files(dir, extensions=['txt'], first_index=(ord('a') - 1), space_i
     for file_path in files_paths_list:
         file = read_text_file(file_path)
         file = normalize_text(file)
-        labels = make_char_array(file, space_token)
-        labels = np.asarray([space_index if x == space_token else ord(x) - first_index for x in labels])
-        files.append(labels)
+        files.append(file)
 
     files = np.array(files)
     return files
