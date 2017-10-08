@@ -228,6 +228,31 @@ def sequence_decoder(sequence, first_index=(ord('a') - 1)):
     return decoded_text
 
 
+def texts_encoder(texts, first_index=(ord('a') - 1), space_index=0, space_token='<space>'):
+    """
+    Encode texts to numbers.
+
+    Args:
+        texts: list of texts.
+            Data directory.
+        first_index: int.
+            First index (usually index of 'a').
+        space_index: int.
+            Index of 'space'.
+        space_token: string.
+            'space' representation.
+    Returns:
+        array of encoded texts.
+    """
+    result = []
+    for text in texts:
+        item = make_char_array(text, space_token)
+        item = np.asarray([space_index if x == space_token else ord(x) - first_index for x in item])
+        result.append(item)
+
+    return np.array(result)
+
+
 def standardize_audios(inputs):
     """
     Standardize audio inputs.
