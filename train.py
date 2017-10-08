@@ -246,6 +246,58 @@ def standardize_audios(inputs):
     return np.array(result)
 
 
+def get_sequence_lengths(inputs):
+    """
+    Get sequence length of each sequence.
+
+    Args:
+        inputs: list of lists where each element is a sequence.
+    Returns:
+        array of sequence lengths.
+    """
+    result = []
+    for input in inputs:
+        result.append(len(input))
+
+    return np.array(result, dtype=np.int64)
+
+
+def make_sequences_same_length(sequences, sequence_lengths, default_value=0.0):
+    """
+    Make sequences same length for avoiding value
+    error: setting an array element with a sequence.
+
+    Args:
+        sequences: list of sequence arrays.
+        sequence_lengths: list of int.
+        default_value: float32.
+            Default value of newly created array.
+    Returns:
+        result: array of with same dimensions [num_samples, max_length, num_features].
+    """
+
+    # Get number of sequnces.
+    num_samples = len(sequences)
+
+    max_length = np.max(sequence_lengths)
+
+    # Get shape of the first non-zero length sequence.
+    sample_shape = tuple()
+    for s in sequences:
+        if len(s) > 0:
+            sample_shape = np.asarray(s).shape[1:]
+            break
+
+    # Create same sizes array
+    result = (np.ones((num_samples, max_length) + sample_shape) * default_value)
+
+    # Put sequences into new array.
+    for idx, sequence in enumerate(sequences):
+        result[idx, :len(sequence)] = sequence
+
+    return result
+
+
 def main(argv):
     # Read text file.
     text_file_path = TRAIN_DIR + "211-122425-0059.txt"
@@ -305,13 +357,13 @@ def main(argv):
             # Reshaping to apply the same weights over the time steps.
             outputs = tf.reshape(outputs, [-1, NUM_HIDDEN])
 
-            weigths = tf.Variable(tf.truncated_normal([NUM_HIDDEN,
+            weights = tf.Variable(tf.truncated_normal([NUM_HIDDEN,
                                                        NUM_CLASSES],
                                                       stddev=0.1))
             biases = tf.Variable(tf.constant(0., shape=[NUM_CLASSES]))
 
             # Doing the affine projection.
-            logits = tf.matmul(outputs, weigths) + biases
+            logits = tf.matmul(outputs, weights) + biases
 
             # Reshaping back to the original shape.
             logits = tf.reshape(logits, [batch_s, -1, NUM_CLASSES])
