@@ -228,6 +228,24 @@ def sequence_decoder(sequence, first_index=(ord('a') - 1)):
     return decoded_text
 
 
+def standardize_audios(inputs):
+    """
+    Standardize audio inputs.
+
+    Args:
+        inputs: array of audios.
+            Audio files.
+    Returns:
+        decoded_text: array of audios.
+    """
+    result = []
+    for i in range(inputs.shape[0]):
+        item = np.array((inputs[i] - np.mean(inputs[i])) / np.std(inputs[i]))
+        result.append(item)
+
+    return np.array(result)
+
+
 def main(argv):
     # Read text file.
     text_file_path = TRAIN_DIR + "211-122425-0059.txt"
@@ -248,7 +266,7 @@ def main(argv):
 
     # Train inputs.
     train_inputs = np.asarray(inputs[np.newaxis, :])
-    train_inputs = (train_inputs - np.mean(train_inputs)) / np.std(train_inputs)
+    train_inputs = standardize_audios(train_inputs)
     train_sequence_length = [train_inputs.shape[1]]
 
     # TODO(ugnelis): define different validation variables.
