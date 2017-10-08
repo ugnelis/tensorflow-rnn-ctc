@@ -8,6 +8,7 @@ import time
 import re
 import logging
 import sys
+import math
 import unicodedata
 import codecs
 
@@ -324,32 +325,40 @@ def make_sequences_same_length(sequences, sequence_lengths, default_value=0.0):
 
 
 def main(argv):
-    # Read text file.
-    text_file_path = TRAIN_DIR + "211-122425-0059.txt"
-    text = read_text_file(text_file_path)
-    text = normalize_text(text)
-
-    # Read audio file.
-    wav_file_path = TRAIN_DIR + "211-122425-0059.wav"
-    audio_rate, audio_data = wav.read(wav_file_path)
-    inputs = mfcc(audio_data, samplerate=audio_rate)
-
-    # Make text as as char array.
-    labels = make_char_array(text, SPACE_TOKEN)
-    labels = np.asarray([SPACE_INDEX if x == SPACE_TOKEN else ord(x) - FIRST_INDEX for x in labels])
-
-    # Labels sparse representation for feeding the placeholder.
-    train_labels = sparse_tuples_from_sequences([labels])
-
-    # Train inputs.
-    train_inputs = np.asarray(inputs[np.newaxis, :])
+    # Read train data files.
+    train_texts = read_text_files(TRAIN_DIR)
+    train_labels = texts_encoder(train_texts,
+                                 first_index=FIRST_INDEX,
+                                 space_index=SPACE_INDEX,
+                                 space_token=SPACE_TOKEN)
+    train_inputs = read_audio_files(TRAIN_DIR)
     train_inputs = standardize_audios(train_inputs)
-    train_sequence_length = [train_inputs.shape[1]]
+    train_sequence_lengths = get_sequence_lengths(train_inputs)
+    train_inputs = make_sequences_same_length(train_inputs, train_sequence_lengths)
 
-    # TODO(ugnelis): define different validation variables.
-    validation_inputs = train_inputs
-    validation_labels = train_labels
-    validation_sequence_length = train_sequence_length
+    # Read validation data files.
+    validation_texts = read_text_files(DEV_DIR)
+    validation_labels = texts_encoder(validation_texts,
+                                      first_index=FIRST_INDEX,
+                                      space_index=SPACE_INDEX,
+                                      space_token=SPACE_TOKEN)
+    validation_labels = sparse_tuples_from_sequences(validation_labels)
+    validation_inputs = read_audio_files(DEV_DIR)
+    validation_inputs = standardize_audios(validation_inputs)
+    validation_sequence_lengths = get_sequence_lengths(validation_inputs)
+    validation_inputs = make_sequences_same_length(validation_inputs, validation_sequence_lengths)
+
+    # Read test data files.
+    test_texts = read_text_files(TEST_DIR)
+    test_labels = texts_encoder(test_texts,
+                                first_index=FIRST_INDEX,
+                                space_index=SPACE_INDEX,
+                                space_token=SPACE_TOKEN)
+    test_labels = sparse_tuples_from_sequences(test_labels)
+    test_inputs = read_audio_files(DEV_DIR)
+    test_inputs = standardize_audios(test_inputs)
+    test_sequence_lengths = get_sequence_lengths(test_inputs)
+    test_inputs = make_sequences_same_length(test_inputs, test_sequence_lengths)
 
     with tf.device('/gpu:0'):
         config = tf.ConfigProto(allow_soft_placement=True)
@@ -357,7 +366,7 @@ def main(argv):
 
         graph = tf.Graph()
         with graph.as_default():
-
+            logging.debug("Starting new TensorFlow graph.")
             inputs_placeholder = tf.placeholder(tf.float32, [None, None, NUM_FEATURES])
 
             # SparseTensor placeholder required by ctc_loss op.
@@ -382,13 +391,13 @@ def main(argv):
             # Reshaping to apply the same weights over the time steps.
             outputs = tf.reshape(outputs, [-1, NUM_HIDDEN])
 
-            weights = tf.Variable(tf.truncated_normal([NUM_HIDDEN,
+            weigths = tf.Variable(tf.truncated_normal([NUM_HIDDEN,
                                                        NUM_CLASSES],
                                                       stddev=0.1))
             biases = tf.Variable(tf.constant(0., shape=[NUM_CLASSES]))
 
             # Doing the affine projection.
-            logits = tf.matmul(outputs, weights) + biases
+            logits = tf.matmul(outputs, weigths) + biases
 
             # Reshaping back to the original shape.
             logits = tf.reshape(logits, [batch_s, -1, NUM_CLASSES])
@@ -402,53 +411,83 @@ def main(argv):
             optimizer = tf.train.MomentumOptimizer(INITIAL_LEARNING_RATE, 0.9).minimize(cost)
 
             # CTC decoder.
-            decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, sequence_length_placeholder)
+            decoded, neg_sum_logits = tf.nn.ctc_greedy_decoder(logits, sequence_length_placeholder)
 
             label_error_rate = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32),
                                                                labels_placeholder))
-        with tf.Session(graph=graph) as session:
-            # Initialize the weights and biases.
-            tf.global_variables_initializer().run()
 
-            for current_epoch in range(NUM_EPOCHS):
-                train_cost = train_label_error_rate = 0
-                start_time = time.time()
+    with tf.Session(graph=graph) as session:
+        logging.debug("Starting TensorFlow session.")
+        # Initialize the weights and biases.
+        tf.global_variables_initializer().run()
 
-                for batch in range(NUM_BATCHES_PER_EPOCH):
-                    feed = {inputs_placeholder: train_inputs,
-                            labels_placeholder: train_labels,
-                            sequence_length_placeholder: train_sequence_length}
+        train_num = train_inputs.shape[0]
+        validation_num = validation_inputs.shape[0]
 
-                    batch_cost, _ = session.run([cost, optimizer], feed)
-                    train_cost += batch_cost * BATCH_SIZE
-                    train_label_error_rate += session.run(label_error_rate, feed_dict=feed) * BATCH_SIZE
+        # Check if there is any example.
+        if train_num <= 0:
+            logging.error("There are no training examples.")
+            return
 
-                train_cost /= NUM_EXAMPLES
-                train_label_error_rate /= NUM_EXAMPLES
+        num_batches_per_epoch = math.ceil(train_num / BATCH_SIZE)
 
-                val_feed = {inputs_placeholder: validation_inputs,
-                            labels_placeholder: validation_labels,
-                            sequence_length_placeholder: validation_sequence_length}
+        for current_epoch in range(NUM_EPOCHS):
+            train_cost = 0
+            train_label_error_rate = 0
+            start_time = time.time()
 
-                validation_cost, validation_label_error_rate = session.run([cost, label_error_rate], feed_dict=val_feed)
+            for batch in range(num_batches_per_epoch):
+                # Format batches.
+                if int(train_num / ((batch + 1) * BATCH_SIZE)) >= 1:
+                    indexes = [i % train_num for i in range(batch * BATCH_SIZE, (batch + 1) * BATCH_SIZE)]
+                else:
+                    indexes = [i % train_num for i in range(batch * BATCH_SIZE, train_num)]
 
-                # Output intermediate step information.
-                logging.info("Epoch %d/%d (time: %.3f s)",
-                             current_epoch + 1,
-                             NUM_EPOCHS,
-                             time.time() - start_time)
-                logging.info("Train cost: %.3f, train label error rate: %.3f",
-                             train_cost,
-                             train_label_error_rate)
-                logging.info("Validation cost: %.3f, validation label error rate: %.3f",
-                             validation_cost,
-                             validation_label_error_rate)
+                batch_train_inputs = train_inputs[indexes]
+                batch_train_sequence_lengths = train_sequence_lengths[indexes]
+                batch_train_targets = sparse_tuples_from_sequences(train_labels[indexes])
 
-            # Decoding.
-            decoded_outputs = session.run(decoded[0], feed_dict=feed)
-            decoded_text = sequence_decoder(decoded_outputs[1])
+                feed = {inputs_placeholder: batch_train_inputs,
+                        labels_placeholder: batch_train_targets,
+                        sequence_length_placeholder: batch_train_sequence_lengths}
 
-            logging.info("Original:\n%s", text)
+                batch_cost, _ = session.run([cost, optimizer], feed)
+                train_cost += batch_cost * BATCH_SIZE
+                train_label_error_rate += session.run(label_error_rate, feed_dict=feed) * BATCH_SIZE
+
+            train_cost /= train_num
+            train_label_error_rate /= train_num
+
+            validation_feed = {inputs_placeholder: validation_inputs,
+                               labels_placeholder: validation_labels,
+                               sequence_length_placeholder: validation_sequence_lengths}
+
+            validation_cost, validation_label_error_rate = session.run([cost, label_error_rate],
+                                                                       feed_dict=validation_feed)
+
+            validation_cost /= validation_num
+            validation_label_error_rate /= validation_num
+
+            # Output intermediate step information.
+            print("Epoch %d/%d (time: %.3f s)" %
+                  (current_epoch + 1, NUM_EPOCHS, time.time() - start_time))
+            print("Train cost: %.3f, train label error rate: %.3f" %
+                  (train_cost, train_label_error_rate))
+            print("Validation cost: %.3f, validation label error rate: %.3f" %
+                  (validation_cost, validation_label_error_rate))
+
+        test_feed = {inputs_placeholder: test_inputs,
+                     sequence_length_placeholder: test_sequence_lengths}
+        # Decoding.
+        decoded_outputs = session.run(decoded[0], feed_dict=test_feed)
+        dense_decoded = tf.sparse_tensor_to_dense(decoded_outputs, default_value=-1).eval(session=session)
+
+        for i, sequence in enumerate(dense_decoded):
+            sequence = [s for s in sequence if s != -1]
+            decoded_text = sequence_decoder(sequence)
+
+            print('Sequence %d' % i)
+            logging.info("Original:\n%s", test_texts[i])
             logging.info("Decoded:\n%s", decoded_text)
 
 
