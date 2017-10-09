@@ -465,12 +465,16 @@ def main(argv):
             validation_label_error_rate /= validation_num
 
             # Output intermediate step information.
-            print("Epoch %d/%d (time: %.3f s)" %
-                  (current_epoch + 1, NUM_EPOCHS, time.time() - start_time))
-            print("Train cost: %.3f, train label error rate: %.3f" %
-                  (train_cost, train_label_error_rate))
-            print("Validation cost: %.3f, validation label error rate: %.3f" %
-                  (validation_cost, validation_label_error_rate))
+            logging.info("Epoch %d/%d (time: %.3f s)",
+                         current_epoch + 1,
+                         NUM_EPOCHS,
+                         time.time() - start_time)
+            logging.info("Train cost: %.3f, train label error rate: %.3f",
+                         train_cost,
+                         train_label_error_rate)
+            logging.info("Validation cost: %.3f, validation label error rate: %.3f",
+                         validation_cost,
+                         validation_label_error_rate)
 
         test_feed = {inputs_placeholder: test_inputs,
                      sequence_length_placeholder: test_sequence_lengths}
