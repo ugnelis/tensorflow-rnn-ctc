@@ -21,7 +21,6 @@ def read_text_file(path):
     Args:
         path: string.
             Path to text file.
-
     Returns:
         string.
             Read text.
@@ -39,7 +38,6 @@ def make_char_array(text, space_token='<space>'):
             Given text.
         space_token: string.
             Text which represents space char.
-
     Returns:
         string array.
             Split text.
@@ -57,7 +55,6 @@ def normalize_text(text, remove_apostrophe=True):
             Given text.
         remove_apostrophe: bool.
             Whether to remove apostrophe in given text.
-
     Returns:
         string.
             Normalized text.

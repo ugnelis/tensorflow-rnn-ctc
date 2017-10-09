@@ -203,12 +203,13 @@ def main(argv):
             # Decoding.
             decoded_outputs = session.run(decoded[0], feed_dict=test_feed)
             dense_decoded = tf.sparse_tensor_to_dense(decoded_outputs, default_value=-1).eval(session=session)
+            test_num = test_texts.shape[0]
 
             for i, sequence in enumerate(dense_decoded):
                 sequence = [s for s in sequence if s != -1]
                 decoded_text = utils.sequence_decoder(sequence)
 
-                print('Sequence %d' % i)
+                logging.info("Sequence %d/%d", i + 1, test_num)
                 logging.info("Original:\n%s", test_texts[i])
                 logging.info("Decoded:\n%s", decoded_text)
 
