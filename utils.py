@@ -29,23 +29,6 @@ def read_text_file(path):
         return file.read()
 
 
-def make_char_array(text, space_token='<space>'):
-    """
-    Make text as char array. Replace spaces with space token.
-
-    Args:
-        text: string.
-            Given text.
-        space_token: string.
-            Text which represents space char.
-    Returns:
-        string array.
-            Split text.
-    """
-    result = np.hstack([space_token if x == ' ' else list(x) for x in text])
-    return result
-
-
 def normalize_text(text, remove_apostrophe=True):
     """
     Normalize given text.
@@ -70,27 +53,41 @@ def normalize_text(text, remove_apostrophe=True):
     return re.sub("[^a-zA-Z']+", ' ', result).strip().lower()
 
 
-def sparse_tuples_from_sequences(sequences, dtype=np.int32):
+def read_text_files(dir, extensions=['txt']):
     """
-    Create a sparse representations of inputs.
+    Read text files.
 
     Args:
-        sequences: a list of lists of type dtype where each element is a sequence
+        dir: string.
+            Data directory.
+        extensions: list of strings.
+            File extensions.
     Returns:
-        A tuple with (indices, values, shape)
+        files: array of texts.
     """
-    indexes = []
-    values = []
+    if not os.path.isdir(dir):
+        logging.error("Text files directory %s is not found.", dir)
+        return None
 
-    for n, sequence in enumerate(sequences):
-        indexes.extend(zip([n] * len(sequence), range(len(sequence))))
-        values.extend(sequence)
+    if not all(isinstance(extension, str) for extension in extensions):
+        logging.error("Variable 'extensions' is not a list of strings.")
+        return None
 
-    indexes = np.asarray(indexes, dtype=np.int64)
-    values = np.asarray(values, dtype=dtype)
-    shape = np.asarray([len(sequences), np.asarray(indexes).max(0)[1] + 1], dtype=np.int64)
+    # Get files list.
+    files_paths_list = []
+    for extension in extensions:
+        file_glob = os.path.join(dir, '*.' + extension)
+        files_paths_list.extend(glob.glob(file_glob))
 
-    return indexes, values, shape
+    # Read files.
+    files = []
+    for file_path in files_paths_list:
+        file = read_text_file(file_path)
+        file = normalize_text(file)
+        files.append(file)
+
+    files = np.array(files)
+    return files
 
 
 def read_audio_files(dir, extensions=['wav']):
@@ -130,41 +127,44 @@ def read_audio_files(dir, extensions=['wav']):
     return files
 
 
-def read_text_files(dir, extensions=['txt']):
+def make_char_array(text, space_token='<space>'):
     """
-    Read text files.
+    Make text as char array. Replace spaces with space token.
 
     Args:
-        dir: string.
-            Data directory.
-        extensions: list of strings.
-            File extensions.
+        text: string.
+            Given text.
+        space_token: string.
+            Text which represents space char.
     Returns:
-        files: array of texts.
+        string array.
+            Split text.
     """
-    if not os.path.isdir(dir):
-        logging.error("Text files directory %s is not found.", dir)
-        return None
+    result = np.hstack([space_token if x == ' ' else list(x) for x in text])
+    return result
 
-    if not all(isinstance(extension, str) for extension in extensions):
-        logging.error("Variable 'extensions' is not a list of strings.")
-        return None
 
-    # Get files list.
-    files_paths_list = []
-    for extension in extensions:
-        file_glob = os.path.join(dir, '*.' + extension)
-        files_paths_list.extend(glob.glob(file_glob))
+def sparse_tuples_from_sequences(sequences, dtype=np.int32):
+    """
+    Create a sparse representations of inputs.
 
-    # Read files.
-    files = []
-    for file_path in files_paths_list:
-        file = read_text_file(file_path)
-        file = normalize_text(file)
-        files.append(file)
+    Args:
+        sequences: a list of lists of type dtype where each element is a sequence
+    Returns:
+        A tuple with (indices, values, shape)
+    """
+    indexes = []
+    values = []
 
-    files = np.array(files)
-    return files
+    for n, sequence in enumerate(sequences):
+        indexes.extend(zip([n] * len(sequence), range(len(sequence))))
+        values.extend(sequence)
+
+    indexes = np.asarray(indexes, dtype=np.int64)
+    values = np.asarray(values, dtype=dtype)
+    shape = np.asarray([len(sequences), np.asarray(indexes).max(0)[1] + 1], dtype=np.int64)
+
+    return indexes, values, shape
 
 
 def sequence_decoder(sequence, first_index=(ord('a') - 1)):
@@ -246,14 +246,14 @@ def get_sequence_lengths(inputs):
     return np.array(result, dtype=np.int64)
 
 
-def make_sequences_same_length(sequences, sequence_lengths, default_value=0.0):
+def make_sequences_same_length(sequences, sequences_lengths, default_value=0.0):
     """
     Make sequences same length for avoiding value
     error: setting an array element with a sequence.
 
     Args:
         sequences: list of sequence arrays.
-        sequence_lengths: list of int.
+        sequences_lengths: list of int.
         default_value: float32.
             Default value of newly created array.
     Returns:
@@ -263,7 +263,7 @@ def make_sequences_same_length(sequences, sequence_lengths, default_value=0.0):
     # Get number of sequnces.
     num_samples = len(sequences)
 
-    max_length = np.max(sequence_lengths)
+    max_length = np.max(sequences_lengths)
 
     # Get shape of the first non-zero length sequence.
     sample_shape = tuple()
