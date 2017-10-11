@@ -19,6 +19,9 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 # Model path.
 MODEL_PATH = "./models/model.ckpt"
 
+# Summary directory.
+SUMMARY_PATH = "./logs/"
+
 # Data directories.
 DATA_DIR = "./data/LibriSpeech/"
 TRAIN_DIR = DATA_DIR + "train-clean-100-wav/"
@@ -115,11 +118,13 @@ def main(argv):
 
             weigths = tf.Variable(tf.truncated_normal([NUM_HIDDEN,
                                                        NUM_CLASSES],
-                                                      stddev=0.1))
-            biases = tf.Variable(tf.constant(0., shape=[NUM_CLASSES]))
+                                                      stddev=0.1),
+                                  name='weights')
+            bias = tf.Variable(tf.constant(0., shape=[NUM_CLASSES]),
+                                 name='bias')
 
             # Doing the affine projection.
-            logits = tf.matmul(outputs, weigths) + biases
+            logits = tf.matmul(outputs, weigths) + bias
 
             # Reshaping back to the original shape.
             logits = tf.reshape(logits, [batch_s, -1, NUM_CLASSES])
@@ -127,8 +132,10 @@ def main(argv):
             # Time is major.
             logits = tf.transpose(logits, (1, 0, 2))
 
-            loss = tf.nn.ctc_loss(labels_placeholder, logits, sequence_length_placeholder)
-            cost = tf.reduce_mean(loss)
+            with tf.name_scope('loss'):
+                loss = tf.nn.ctc_loss(labels_placeholder, logits, sequence_length_placeholder)
+                cost = tf.reduce_mean(loss)
+                tf.summary.scalar("loss", cost)
 
             optimizer = tf.train.MomentumOptimizer(INITIAL_LEARNING_RATE, 0.9).minimize(cost)
 
@@ -143,6 +150,12 @@ def main(argv):
 
             # Saver op to save and restore all the variables.
             saver = tf.train.Saver()
+
+            # Merge all the summaries and write them out.
+            merged_summary = tf.summary.merge_all()
+
+            # Initializing summary writer for TensorBoard.
+            summary_writer = tf.summary.FileWriter(SUMMARY_PATH, tf.get_default_graph())
 
             # Initialize the weights and biases.
             tf.global_variables_initializer().run()
@@ -162,12 +175,12 @@ def main(argv):
                 train_label_error_rate = 0
                 start_time = time.time()
 
-                for batch in range(num_batches_per_epoch):
+                for step in range(num_batches_per_epoch):
                     # Format batches.
-                    if int(train_num / ((batch + 1) * BATCH_SIZE)) >= 1:
-                        indexes = [i % train_num for i in range(batch * BATCH_SIZE, (batch + 1) * BATCH_SIZE)]
+                    if int(train_num / ((step + 1) * BATCH_SIZE)) >= 1:
+                        indexes = [i % train_num for i in range(step * BATCH_SIZE, (step + 1) * BATCH_SIZE)]
                     else:
-                        indexes = [i % train_num for i in range(batch * BATCH_SIZE, train_num)]
+                        indexes = [i % train_num for i in range(step * BATCH_SIZE, train_num)]
 
                     batch_train_inputs = train_inputs[indexes]
                     batch_train_sequence_lengths = train_sequence_lengths[indexes]
@@ -177,9 +190,12 @@ def main(argv):
                             labels_placeholder: batch_train_targets,
                             sequence_length_placeholder: batch_train_sequence_lengths}
 
-                    batch_cost, _ = session.run([cost, optimizer], feed)
+                    batch_cost, _, summary = session.run([cost, optimizer, merged_summary], feed)
                     train_cost += batch_cost * BATCH_SIZE
                     train_label_error_rate += session.run(label_error_rate, feed_dict=feed) * BATCH_SIZE
+
+                    # Write logs at every iteration.
+                    summary_writer.add_summary(summary, current_epoch * num_batches_per_epoch + step)
 
                 train_cost /= train_num
                 train_label_error_rate /= train_num
@@ -224,7 +240,6 @@ def main(argv):
             # Save model weights to disk.
             save_path = saver.save(session, MODEL_PATH)
             logging.info("Model saved in file: %s", save_path)
-
 
 
 if __name__ == '__main__':
