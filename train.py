@@ -16,7 +16,11 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
                     level=logging.DEBUG,
                     stream=sys.stdout)
 
-DATA_DIR = "data/LibriSpeech/"
+# Model path.
+MODEL_PATH = "./models/model.ckpt"
+
+# Data directories.
+DATA_DIR = "./data/LibriSpeech/"
 TRAIN_DIR = DATA_DIR + "train-clean-100-wav/"
 TEST_DIR = DATA_DIR + "test-clean-wav/"
 DEV_DIR = DATA_DIR + "dev-clean-wav/"
@@ -136,6 +140,10 @@ def main(argv):
 
         with tf.Session(config=config, graph=graph) as session:
             logging.debug("Starting TensorFlow session.")
+
+            # Saver op to save and restore all the variables.
+            saver = tf.train.Saver()
+
             # Initialize the weights and biases.
             tf.global_variables_initializer().run()
 
@@ -212,6 +220,11 @@ def main(argv):
                 logging.info("Sequence %d/%d", i + 1, test_num)
                 logging.info("Original:\n%s", test_texts[i])
                 logging.info("Decoded:\n%s", decoded_text)
+
+            # Save model weights to disk.
+            save_path = saver.save(session, MODEL_PATH)
+            logging.info("Model saved in file: %s", save_path)
+
 
 
 if __name__ == '__main__':
