@@ -111,23 +111,21 @@ def main(argv):
             outputs, _ = tf.nn.dynamic_rnn(stack, inputs_placeholder, sequence_length_placeholder, dtype=tf.float32)
 
             shape = tf.shape(inputs_placeholder)
-            batch_s, max_time_steps = shape[0], shape[1]
+            batch_size, max_time_steps = shape[0], shape[1]
 
             # Reshaping to apply the same weights over the time steps.
             outputs = tf.reshape(outputs, [-1, NUM_HIDDEN])
 
-            weigths = tf.Variable(tf.truncated_normal([NUM_HIDDEN,
-                                                       NUM_CLASSES],
-                                                      stddev=0.1),
+            weights = tf.Variable(tf.truncated_normal([NUM_HIDDEN, NUM_CLASSES], stddev=0.1),
                                   name='weights')
             bias = tf.Variable(tf.constant(0., shape=[NUM_CLASSES]),
-                                 name='bias')
+                               name='bias')
 
             # Doing the affine projection.
-            logits = tf.matmul(outputs, weigths) + bias
+            logits = tf.matmul(outputs, weights) + bias
 
             # Reshaping back to the original shape.
-            logits = tf.reshape(logits, [batch_s, -1, NUM_CLASSES])
+            logits = tf.reshape(logits, [batch_size, -1, NUM_CLASSES])
 
             # Time is major.
             logits = tf.transpose(logits, (1, 0, 2))
