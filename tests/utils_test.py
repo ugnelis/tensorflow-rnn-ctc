@@ -11,7 +11,7 @@ TEST_FILE_EXTENSION = 'txt'
 TEST_AUDIO_FILE_DIR = 'data/LibriSpeech/test-clean-wav'
 
 
-class TestUtils(unittest.TestCase):
+class UtilsTest(unittest.TestCase):
     def setUp(self):
         self.test_file_dir = mkdtemp()
 
