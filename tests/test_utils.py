@@ -8,7 +8,7 @@ from shutil import rmtree
 TEST_FILE_EXTENSION = 'txt'
 
 # Directory of test suite wav audio files.
-TEST_AUDIO_FILE_DIR = './data/audio'
+TEST_AUDIO_FILE_DIR = 'tests/data/audio'
 
 
 class TestUtils(unittest.TestCase):
