@@ -8,7 +8,7 @@ from shutil import rmtree
 TEST_FILE_EXTENSION = 'txt'
 
 # Directory of test suite wav audio files.
-TEST_AUDIO_FILE_DIR = 'tests/data/audio'
+TEST_AUDIO_FILE_DIR = 'data/LibriSpeech/test-clean-wav'
 
 
 class TestUtils(unittest.TestCase):
@@ -31,8 +31,12 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(utils.normalize_text(text), 'a')
         self.assertEqual(utils.normalize_text(text, False), 'a\'')
 
-    # todo
-    # def test_sparse_tuples_from_sequences(self):
+    def test_sparse_tuples_from_sequences(self):
+        result = utils.sparse_tuples_from_sequences([[1], [2, 3]])
+
+        self.assertEqual(result[0].tolist(), [[0, 0], [1, 0], [1, 1]])
+        self.assertEqual(result[1].tolist(), [1, 2, 3])
+        self.assertEqual(result[2].tolist(), [2, 2])
 
     def test_read_audio_files(self):
         self.assertTrue(utils.read_audio_files(TEST_AUDIO_FILE_DIR).size > 0)
@@ -47,8 +51,9 @@ class TestUtils(unittest.TestCase):
     def test_texts_encoder(self):
         self.assertEqual(utils.texts_encoder(['abc']).tolist()[0], [1, 2, 3])
 
-    # todo
-    # def test_standardize_audios(self):
+    def test_standardize_audios(self):
+        files = utils.read_audio_files(TEST_AUDIO_FILE_DIR)
+        self.assertEqual(utils.standardize_audios(files).size, files.size)
 
     def test_get_sequence_lengths(self):
         self.assertEqual(utils.get_sequence_lengths([[1], [], [1, 2]]).tolist(), [1, 0, 2])
