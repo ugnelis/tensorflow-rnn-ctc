@@ -3,8 +3,12 @@ python:
   - "3.5"
 install:
   - pip install -r requirements.txt
+
+  # See https://gist.github.com/dan-blanchard/7045057
+  - pip install --upgrade pip setuptools wheel
+  - pip install --only-binary=numpy,scipy numpy scipy
 script:
-  - python -m unittest discover --pattern=*_test.py
+  - python -m unittest discover tests
 notifications:
   email:
     on_success: never
