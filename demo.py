@@ -137,10 +137,6 @@ def main(argv):
                 logging.info("Original:\n%s", test_texts[i])
                 logging.info("Decoded:\n%s", decoded_text)
 
-            # Save model weights to disk.
-            save_path = saver.save(session, MODEL_PATH)
-            logging.info("Model saved in file: %s", save_path)
-
 
 if __name__ == '__main__':
     tf.app.run()
