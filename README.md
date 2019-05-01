@@ -6,7 +6,7 @@ Connectionist Temporal Classification (CTC) by using Recurrent Neural Network (R
 
 - Python 2.7+ (for Linux)
 - Python 3.5+ (for Windows)
-- TensorFlow 1.0+
+- TensorFlow 1.12.1+
 - NumPy 1.5+
 - SciPy 0.12+
 - python_speech_features 0.1+
